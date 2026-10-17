@@ -1,0 +1,101 @@
+---
+title: "IMC KM curve example R Notebook"
+output: html_notebook
+---
+
+First, load the libraries you'll need
+
+```{r}
+library(data.table)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(ggsurvfit)
+```
+
+Then, load in the data that you want to examine as predictors of outcomes.
+
+```{r}
+rfs_df <- fread("SurvivalCurves_IMC.csv")
+```
+
+#### Some definitions:
+
+**RFS** = recurrence free survival, where 0 means no recurrence and 1 is recurrent disease
+
+**RFS days** = the number of days after treatment completion and recurrence diagnosis, death from any cause, whichever is first, or last known medonc clinical visit for patients with no recurrence
+
+**CSS** = cancer-specific survival, where 0 means living, and 1 is death due to breast-cancer
+
+**CSS days** = the number of days after initial diagnosis and breast cancer death, or last known clinical visit.
+
+**CSS 5y** and **RFS 5 y** are the same definitions as above, except that all events and followups have been censored to 5 years.
+
+For plotting, I would advise converting the days to year.
+
+```{r}
+rfs_df$RFSyrs <- rfs_df$RFSDays/365.25
+```
+
+Now, let's see how a variable grouping/categorical variable is associated with recurrence free survival. If you have a continuous variable, convert it into categorical by grouping (e.g. `Age group`) or grouping into "low", "medium", "high" or "Positive" & "Negative" etc
+
+
+Now, let's fit some KM models
+
+First, let's fit the immune grouping
+```{r}
+km_fit_immune <- survfit2(Surv(RFSyrs, RFSStat) ~ Immune_Group, data = rfs_df) |>
+  ggsurvfit(linewidth = 1) +
+  add_confidence_interval() +
+  add_risktable() +
+  add_pvalue(caption = "Log-rank {p.value}") +
+  add_quantile(y_value = 0.6, color = "gray50", linewidth = 0.75) +
+  scale_ggsurvfit()
+
+ggsave(filename="RFS_immune_group_IMC.pdf")
+
+```
+
+You can compare 2 variables, for example:
+```{r}
+km_fit_immune_chemo <- survfit2(Surv(RFSyrs, RFSStat) ~ Immune_Group + rfs_df$`Chemo type`, data = rfs_df) |>
+  ggsurvfit(linewidth = 1) +
+  add_confidence_interval() +
+  add_risktable() +
+  add_pvalue(caption = "Log-rank {p.value}") +
+  add_quantile(y_value = 0.6, color = "gray50", linewidth = 0.75) +
+  scale_ggsurvfit()
+
+ggsave(filename="RFS_immune_group_chemo_IMC.pdf")
+```
+
+
+Change some setting of the figure HERE:
+
+```{r}
+km_fit_immune <- survfit2(Surv(RFSyrs, RFSStat) ~ RecurrenceType, data = rfs_df) |>
+  ggsurvfit(linewidth = 1) +
+  add_confidence_interval() +
+  add_risktable() +
+  add_pvalue(caption = "Log-rank {p.value}", size = 12) +
+  add_quantile(y_value = 0.6, color = "gray50", linewidth = 0.75) +
+  scale_ggsurvfit() + 
+  scale_color_manual(values = c('#42d0d3', '#f9867e')) +
+  scale_fill_manual(values = c('#42d0d3', '#f9867e')) +
+  labs(
+    x = "Time (Year)",
+    y = "Recurrence-free Survival Probability"
+  ) +
+  theme(legend.text = element_text(size = 14))
+
+ggsave(filename="3D_RFS_RecurrenceType.png", dpi = 250)
+
+
+
+```
+
+
+
+
+
+
