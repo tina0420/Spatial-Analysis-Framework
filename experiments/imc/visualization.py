@@ -196,8 +196,8 @@ def plot_compare_clustering_line(adata, method, out_dir, figsize=(5, 7), name=No
     plt.clf()
 
 
-def plot_spatial_cluster_distribution(adata, i, cluster_key, out_dir, figsize=(7, 7), dotsize=1,
-                                      color=COLORS, name=None, dpi=300):
+def plot_spatial_cluster_distribution(adata, cluster_key, out_dir, figsize=(7, 7), dotsize=1,
+                                      color=COLORS, name=None, dpi=150):
     """
     :param adata: AnnData
     :param cluster_key: indicate which cluster key to use in obs, type: str
@@ -210,52 +210,96 @@ def plot_spatial_cluster_distribution(adata, i, cluster_key, out_dir, figsize=(7
     labels = adata.obs[cluster_key].values
     label_categories = adata.obs[cluster_key].cat.categories
     is_digit_labels = all(str(e).isdigit() for e in labels)
-    rows = len(construct_range(len(pd.unique(labels)) - 1, 7))
 
-    fig, axes = plt.subplots(rows, ncol, figsize=figsize)
-    for i, ax in enumerate(fig.axes):
-        if i > len(pd.unique(labels)) - 1:
-            ax.spines['top'].set_visible(False)
-            ax.spines['right'].set_visible(False)
-            ax.spines['bottom'].set_visible(False)
-            ax.spines['left'].set_visible(False)
-            ax.set_xticks([])
-            ax.set_yticks([])
-            continue
+    fig, ax = plt.subplots(1, 1, figsize=figsize)
 
+    for i in range(len(label_categories)):
         lbl_idxs = np.where(labels == label_categories[i])[0]
-        non_lbl_idxs = np.where(labels != label_categories[i])[0]
-
-        subset = adata.obsm["spatial"][lbl_idxs]
-        inv_subset = adata.obsm["spatial"][non_lbl_idxs]
-
-        # Plot the background
-        ax.scatter(inv_subset[:, 0], -inv_subset[:, 1], s=dotsize, c="#e0e0e0")
 
         if is_digit_labels:
-            ax.scatter(subset[:, 0], -subset[:, 1], s=dotsize, c=COLORS[int(label_categories[i])])
+            ax.scatter(adata.obsm["spatial"][lbl_idxs][:, 0],
+                       -adata.obsm["spatial"][lbl_idxs][:, 1],
+                       c=COLORS[int(label_categories[i])], s=dotsize, label=label_categories[i])
         else:
-            ax.scatter(subset[:, 0], -subset[:, 1], s=dotsize, c=color[label_categories[i]])
+            ax.scatter(adata.obsm["spatial"][lbl_idxs][:, 0],
+                       -adata.obsm["spatial"][lbl_idxs][:, 1],
+                       c=color[label_categories[i]], s=dotsize, label=label_categories[i])
 
-        ax.grid(False)
-        ax.xaxis.set_tick_params(labelbottom=False)
-        ax.yaxis.set_tick_params(labelleft=False)
-        ax.set_xticks([])
-        ax.set_yticks([])
+    ax.axis('off')
+    ax.set(xlabel="X Axis", ylabel="Y Axis", xticklabels=[], yticklabels=[])
+    # ax.set_title(f"{name}", weight="bold", fontsize=12)
+    if adata.obs["Recurrence status"].values[0] == 0:
+        observation = "NR"
+    else:
+        observation = "R"
 
-        ax.set_title(f"{label_categories[i]} (n={len(lbl_idxs)})", weight="bold", fontsize=7)
+    ax.set_title(f"{observation}-Patient {adata.obs.image_id.values[0]}", weight="bold", fontsize=12)
+
+    # # Reorder the items in the legend, e.g. Yes, No, T-Cell and Others
+    # handles, labels = ax.get_legend_handles_labels()
+    # # Original order: No, Others, T-Cell and Yes -> 0, 1, 2, 3
+    # order = [3, 0, 2, 1]
+    #
+    # ax.legend([handles[idx] for idx in order],
+    #           [labels[idx] for idx in order],
+    #           loc='upper center',
+    #           bbox_to_anchor=(0.5, -0.02),
+    #           fancybox=True,
+    #           ncol=2,
+    #           frameon=False,
+    #           fontsize=11,
+    #           markerscale=5)
+
+    # fontsize 7 for cell niche, fontsize 8 for layer2
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.02),
+                  fancybox=True, ncol=3, frameon=False, fontsize=5, markerscale=5)
 
     plt.tight_layout()
 
     if name:
-        plt.savefig(out_dir / f"{name}_spatial_cluster_panel.png", dpi=500)
+        plt.savefig(out_dir / f"{name}_spatial_cluster_distribution.png", dpi=dpi)
     else:
-        plt.savefig(out_dir / "spatial_cluster_panel.png", dpi=500)
+        plt.savefig(out_dir / "spatial_cluster_distribution.png", dpi=dpi)
+
     plt.clf()
 
 
-def plot_cell_count():
-    pass
+def plot_cluster_cell_count(adata, cluster_key, out_dir, figsize=(3.5, 2), name=None, dpi=100):
+    """
+    :param adata: AnnData
+    :param cluster_key: indicate which cluster key to use in obs, type: str
+    :param out_dir: output path, type: Path
+    :param figsize: figure size, type: tuple
+    :param name: additional label for the file name, type: str
+    :return:
+    """
+    label_df = pd.DataFrame(adata.obs[cluster_key].values, columns=["label"])
+    cluster_cell_count = label_df["label"].value_counts().reset_index()
+    cluster_cell_count.columns = ["Cluster", "Count"]
+    cluster_cell_count = cluster_cell_count.sort_values(by="Cluster")
+
+    fig, ax = plt.subplots(1, 1, figsize=figsize)
+
+    sns.barplot(data=cluster_cell_count, x="Cluster", y="Count", color="#1f77b4")
+
+    plt.xticks(fontsize=8, rotation=35, ha="right")
+    # plt.yticks([0, 50000, 100000], fontsize=8)
+    plt.yticks(fontsize=8)
+
+    plt.grid(alpha=0.1)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    plt.xlabel("Cluster", fontsize=8)
+    plt.ylabel("Cell Count", fontsize=8)
+
+    plt.tight_layout()
+
+    if name:
+        plt.savefig(out_dir / f"{name}_cluster_cell_count.png", dpi=dpi)
+    else:
+        plt.savefig(out_dir / "cluster_cell_count.png", dpi=dpi)
+    plt.clf()
 
 
 def plot_cell_area_count(adata, out_dir, figsize=(3.5, 2), name=None):
@@ -280,8 +324,41 @@ def plot_cell_area_count(adata, out_dir, figsize=(3.5, 2), name=None):
         plt.savefig(out_dir / f"{name}_cell_area.png", dpi=500)
     else:
         plt.savefig(out_dir / "cell_area.png", dpi=500)
+
     plt.clf()
 
+
+def plot_cell_area(adata, out_dir, figsize=(3.5, 2), name=None):
+    """
+    :param adata: AnnData
+    :param out_dir: output path, type: Path
+    :param figsize: figure size, type: tuple
+    :param name: additional label for the file name, type: str
+    :return:
+    """
+    cell_area = pd.DataFrame({"cell_area": adata.obs["area"]})
+
+    fig, ax = plt.subplots(1, 1, figsize=figsize)
+
+    sns.histplot(data=cell_area, x="cell_area", binwidth=3)
+
+    plt.xlabel("Cell Area", fontsize=8)
+    plt.ylabel("Cell Count", fontsize=8)
+    plt.xticks(fontsize=8)
+    plt.yticks(fontsize=8)
+
+    plt.grid(alpha=0.1)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    plt.tight_layout()
+
+    if name:
+        plt.savefig(out_dir / f"{name}_cell_area.png", dpi=500)
+    else:
+        plt.savefig(out_dir / "cell_area.png", dpi=500)
+
+    plt.clf()
 
 
 """

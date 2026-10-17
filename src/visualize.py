@@ -756,7 +756,7 @@ def plot_cluster_cell_count(adata, cluster_key, out_dir, figsize=(3.5, 2), name=
 
 
 def plot_spatial_cluster_distribution(adata, cluster_key, out_dir, figsize=(7, 7), dotsize=1,
-                                      color=COLORS, name=None, dpi=300):
+                                      color=COLORS, name=None, dpi=150):
     """
     :param adata: AnnData
     :param cluster_key: indicate which cluster key to use in obs, type: str
@@ -811,7 +811,7 @@ def plot_spatial_cluster_distribution(adata, cluster_key, out_dir, figsize=(7, 7
 
     # fontsize 7 for cell niche, fontsize 8 for layer2
     ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.02),
-                  fancybox=True, ncol=3, frameon=False, fontsize=7, markerscale=5)
+                  fancybox=True, ncol=3, frameon=False, fontsize=5, markerscale=5)
 
     plt.tight_layout()
 

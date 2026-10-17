@@ -6,12 +6,11 @@ from segmentation import run_mesmer
 from marker_quality_control import run_qc
 from marker_quality_control import plot_marker_nuclear_per_image
 import scanpy as sc
-from visualization import plot_zscore_cluster_mean_heatmap
+from visualization import *
 from clustering import compare_clustering_resolutions
 from visualization import plot_compare_clustering_line
 from utils import update_labels
-from src.visualize import (plot_spatial_cluster_panel, plot_spatial_cluster_distribution, COLOR_CODE)
-from experiments.tnbc_imc.tnbc_imc_setup_analysis import *
+from analysis_setup import *
 import numpy as np
 
 
@@ -25,7 +24,7 @@ if __name__ == '__main__':
         os.makedirs(OUT_DIR, exist_ok=True)
 
     # Load dataset
-    adata = read_h5ad(IN_DIR / f"{EXPERIMENT}.h5ad")
+    adata = read_h5ad(IN_DIR / f"{EXPERIMENT}_layer2.h5ad")
 
     # # Segmentation (processing with .TIFFs)
     # NUCLEAR_CHANNELS = [31]
@@ -80,198 +79,198 @@ if __name__ == '__main__':
     #                               in_dir=IN_DIR,
     #                               out_dir=OUT_DIR)
 
-    # Clustering for cell types
-    # First-round clustering: ESI
-    OUT_DIR = Path(f"output/{EXPERIMENT}/cell_type")
-    if os.path.exists(OUT_DIR) == 0:
-        os.makedirs(OUT_DIR, exist_ok=True)
-
-    METHOD = 'leiden'
-    MARKER_LIST = ['CK5', 'CK7', 'CK8-18', 'panCK',
-                   'CD3e', 'CD20', 'CD45', 'CD68',
-                   'CD31', 'SMA', 'Vimentin']
-
-    RESOLUTIONS = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-
-    adata_layer1 = adata[:, MARKER_LIST].copy()
-    sc.tl.pca(adata_layer1, n_comps=6, svd_solver='arpack')
-    sc.pp.neighbors(adata_layer1, n_neighbors=15, use_rep='X_pca')
-
-    # Grid search for clustering with different resolution
-    for res in RESOLUTIONS:
-        CLUSTER_KEY = f'layer_1_{res:.1f}'
-        print(f"Resolution: {res:.1f}")
-
-        # sc.tl.leiden(adata_layer1, resolution=res, key_added=CLUSTER_KEY)
-
-        print("Plotting")
-        plot_zscore_cluster_mean_heatmap(
-            adata=adata_layer1,
-            column_names=MARKER_LIST,
-            cluster_key=CLUSTER_KEY,
-            out_dir=OUT_DIR,
-            vmax=3,
-            vmin=-1,
-            figsize=(7, 7),
-            name=f'layer_1_{res:.1f}'
-        )
-
-    # 0.6 showed the best clustering performance so we give cell annotation for the clusters from this resolution
-    METHOD = 'davies_bouldin'
-    compare_clustering_resolutions(adata=adata_layer1,
-                                   resolutions=RESOLUTIONS,
-                                   method=METHOD)
-
-    plot_compare_clustering_line(adata=adata_layer1,
-                                 method=METHOD,
-                                 out_dir=OUT_DIR,
-                                 figsize=(7, 5),
-                                 name="layer_1")
-
-    # Layer1 annotation-ESI
-    # Layer 1 cell type annotation
-    CLUSTER_KEY = 'layer_1_0.6'
-    NEW_CLUSTER_KEY = "layer_1"
-    esi = ['Immune', 'Epithelial', 'Stromal', 'Immune', 'Epithelial',
-           'Epithelial', 'Epithelial', 'Immune', 'Stromal', 'Undefined',
-           'Stromal', 'Stromal', 'Immune', 'Immune', 'Undefined']
-
-    # Update the labels to Anndata object
-    esi_map = dict(zip(range(len(esi)), esi))
-    adata_layer1.obs[CLUSTER_KEY] = adata_layer1.obs[CLUSTER_KEY].astype(int)
-    update_labels(adata_layer1, NEW_CLUSTER_KEY, [esi_map[i] for i in adata_layer1.obs[CLUSTER_KEY]])
-    adata.obs[NEW_CLUSTER_KEY] = adata_layer1.obs[NEW_CLUSTER_KEY]
-    adata = adata[adata.obs[NEW_CLUSTER_KEY] != "Undefined"]
-
-    # Validation of first round cell type annotation
-    plot_zscore_cluster_mean_heatmap(adata, MARKER_LIST, NEW_CLUSTER_KEY,
-                                     OUT_DIR, vmax=1, vmin=-0.5, figsize=(7, 7), name=f"{NEW_CLUSTER_KEY}")
-
-    # ESI cell type distributions
-    for roi in set(adata.obs.unique_img_key):
-        temp_adata = adata[adata.obs["unique_img_key"] == roi]
-        plot_spatial_cluster_distribution(adata=temp_adata, cluster_key=NEW_CLUSTER_KEY, out_dir=OUT_DIR,
-                                          color=ESI_CELL_TYPE_COLOR_DICT,
-                                          figsize=(3.5, 3.5), dotsize=0.5, name=roi + "_L1")
-
-    adata.write(IN_DIR / f"{EXPERIMENT}_layer1.h5ad")
-
-    # Second-round clustering
-    CLUSTER_KEY = 'layer_1'
-    NEW_CLUSTER_KEY = 'layer_2'
+    # # Clustering for cell types
+    # # First-round clustering: ESI
+    # OUT_DIR = Path(f"output/{EXPERIMENT}/cell_type")
+    # if os.path.exists(OUT_DIR) == 0:
+    #     os.makedirs(OUT_DIR, exist_ok=True)
+    #
+    # METHOD = 'leiden'
+    # MARKER_LIST = ['CK5', 'CK7', 'CK8-18', 'panCK',
+    #                'CD3e', 'CD20', 'CD45', 'CD68',
+    #                'CD31', 'SMA', 'Vimentin']
+    #
+    # RESOLUTIONS = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    #
+    # adata_layer1 = adata[:, MARKER_LIST].copy()
+    # sc.tl.pca(adata_layer1, n_comps=6, svd_solver='arpack')
+    # sc.pp.neighbors(adata_layer1, n_neighbors=15, use_rep='X_pca')
+    #
+    # # Grid search for clustering with different resolution
+    # for res in RESOLUTIONS:
+    #     CLUSTER_KEY = f'layer_1_{res:.1f}'
+    #     print(f"Resolution: {res:.1f}")
+    #
+    #     # sc.tl.leiden(adata_layer1, resolution=res, key_added=CLUSTER_KEY)
+    #
+    #     print("Plotting")
+    #     plot_zscore_cluster_mean_heatmap(
+    #         adata=adata_layer1,
+    #         column_names=MARKER_LIST,
+    #         cluster_key=CLUSTER_KEY,
+    #         out_dir=OUT_DIR,
+    #         vmax=3,
+    #         vmin=-1,
+    #         figsize=(7, 7),
+    #         name=f'layer_1_{res:.1f}'
+    #     )
+    #
+    # # 0.6 showed the best clustering performance so we give cell annotation for the clusters from this resolution
+    # METHOD = 'davies_bouldin'
+    # compare_clustering_resolutions(adata=adata_layer1,
+    #                                resolutions=RESOLUTIONS,
+    #                                method=METHOD)
+    #
+    # plot_compare_clustering_line(adata=adata_layer1,
+    #                              method=METHOD,
+    #                              out_dir=OUT_DIR,
+    #                              figsize=(7, 5),
+    #                              name="layer_1")
+    #
+    # # Layer1 annotation-ESI
+    # # Layer 1 cell type annotation
+    # CLUSTER_KEY = 'layer_1_0.6'
+    # NEW_CLUSTER_KEY = "layer_1"
+    # esi = ['Immune', 'Epithelial', 'Stromal', 'Immune', 'Epithelial',
+    #        'Epithelial', 'Epithelial', 'Immune', 'Stromal', 'Undefined',
+    #        'Stromal', 'Stromal', 'Immune', 'Immune', 'Undefined']
+    #
+    # # Update the labels to Anndata object
+    # esi_map = dict(zip(range(len(esi)), esi))
+    # adata_layer1.obs[CLUSTER_KEY] = adata_layer1.obs[CLUSTER_KEY].astype(int)
+    # update_labels(adata_layer1, NEW_CLUSTER_KEY, [esi_map[i] for i in adata_layer1.obs[CLUSTER_KEY]])
+    # adata.obs[NEW_CLUSTER_KEY] = adata_layer1.obs[NEW_CLUSTER_KEY]
+    # adata = adata[adata.obs[NEW_CLUSTER_KEY] != "Undefined"]
+    #
+    # # Validation of first round cell type annotation
+    # plot_zscore_cluster_mean_heatmap(adata, MARKER_LIST, NEW_CLUSTER_KEY,
+    #                                  OUT_DIR, vmax=1, vmin=-0.5, figsize=(7, 7), name=f"{NEW_CLUSTER_KEY}")
+    #
+    # # ESI cell type distributions
+    # for roi in set(adata.obs.unique_img_key):
+    #     temp_adata = adata[adata.obs["unique_img_key"] == roi]
+    #     plot_spatial_cluster_distribution(adata=temp_adata, cluster_key=NEW_CLUSTER_KEY, out_dir=OUT_DIR,
+    #                                       color=ESI_CELL_TYPE_COLOR_DICT,
+    #                                       figsize=(3.5, 3.5), dotsize=0.5, name=roi + "_L1")
+    #
+    # adata.write(IN_DIR / f"{EXPERIMENT}_layer1.h5ad")
+    #
+    # # Second-round clustering
+    # CLUSTER_KEY = 'layer_1'
+    # NEW_CLUSTER_KEY = 'layer_2'
     LAYER_2_E_MARKERS = ['CK5', 'CK7', 'CK8-18']
     LAYER_2_TME_MARKERS = ['CD3e', 'CD20', 'CD45', 'CD68',
                            'CD31', 'SMA', 'Vimentin']
-
-    adata_layer2_e = adata[:, LAYER_2_E_MARKERS].copy()
-    adata_layer2_e = adata_layer2_e[adata_layer2_e.obs[CLUSTER_KEY] == "Epithelial"]
-    adata_layer2_tme =adata[:, LAYER_2_TME_MARKERS].copy()
-    adata_layer2_tme = adata_layer2_tme[adata_layer2_tme.obs[CLUSTER_KEY] != "Epithelial"]
-
-    # layer 2 clustering: grid search on resolution
-    RESOLUTIONS = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-
-    sc.pp.neighbors(adata_layer2_e, n_neighbors=15, use_rep='X_pca')
-
-    # Grid search for clustering with different resolution
-    for res in RESOLUTIONS:
-        CLUSTER_KEY = f'layer_2_{res:.1f}'
-        print(f"Resolution: {res:.1f}")
-
-        sc.tl.leiden(adata_layer2_e, resolution=res, key_added=CLUSTER_KEY)
-
-        print("Plotting")
-        plot_zscore_cluster_mean_heatmap(
-            adata=adata_layer2_e,
-            column_names=LAYER_2_E_MARKERS,
-            cluster_key=CLUSTER_KEY,
-            out_dir=OUT_DIR,
-            vmax=1.5,
-            vmin=-0.5,
-            figsize=(7, 7),
-            name=f'layer_2_{res:.1f}'
-        )
-
-    METHOD = 'davies_bouldin'
-    compare_clustering_resolutions(adata=adata_layer2_e,
-                                   resolutions=RESOLUTIONS,
-                                   method=METHOD)
-
-    plot_compare_clustering_line(adata=adata_layer2_e,
-                                 method=METHOD,
-                                 out_dir=OUT_DIR,
-                                 figsize=(7, 5),
-                                 name="layer_2")
-    # resolution 0.6 shows the best clustering result, so here we annotate the clusters from under that resolution
-    e_labels = ["CK7+ Luminal", "CK5+ Basal", "CK+ Epithelial", "CK5+ Basal", "CK7+ Luminal",
-                "CK+ Epithelial", "CK5+ Basal", "CK+ Epithelial", "CK+ Epithelial", "CK5+ Basal",
-                "CK5+ Basal", "CK8/18+ Luminal"]
-
-    # Update the labels to Anndata object
-    CLUSTER_KEY = "layer_2_0.6"
-    NEW_CLUSTER_KEY = "layer_2"
-    e_map = dict(zip(range(len(e_labels)), e_labels))
-    adata_layer2_e.obs[CLUSTER_KEY] = adata_layer2_e.obs[CLUSTER_KEY].astype(int)
-    update_labels(adata_layer2_e, NEW_CLUSTER_KEY, [e_map[i] for i in adata_layer2_e.obs[CLUSTER_KEY]])
-
-    # Validation of first round cell type annotation
-    plot_zscore_cluster_mean_heatmap(adata_layer2_e, LAYER_2_E_MARKERS, NEW_CLUSTER_KEY,
-                                     OUT_DIR, vmax=1, vmin=-0.5, figsize=(7, 7), name=f"{NEW_CLUSTER_KEY}_e")
-
-    # layer 2 clustering for tme group
-    sc.pp.neighbors(adata_layer2_tme, n_neighbors=15, use_rep='X_pca')
-
-    # Grid search for clustering with different resolution
-    for res in RESOLUTIONS:
-        CLUSTER_KEY = f'layer_2_{res:.1f}'
-        print(f"Resolution: {res:.1f}")
-
-        #sc.tl.leiden(adata_layer2_tme, resolution=res, key_added=CLUSTER_KEY)
-
-        print("Plotting")
-        plot_zscore_cluster_mean_heatmap(
-            adata=adata_layer2_tme,
-            column_names=LAYER_2_TME_MARKERS,
-            cluster_key=CLUSTER_KEY,
-            out_dir=OUT_DIR,
-            vmax=2,
-            vmin=-1,
-            figsize=(7, 7),
-            name=f'layer_2_{res:.1f}'
-        )
-
-    METHOD = 'davies_bouldin'
-    compare_clustering_resolutions(adata=adata_layer2_tme,
-                                   resolutions=RESOLUTIONS,
-                                   method=METHOD)
-
-    plot_compare_clustering_line(adata=adata_layer2_tme,
-                                 method=METHOD,
-                                 out_dir=OUT_DIR,
-                                 figsize=(7, 5),
-                                 name="layer_2")
-    # resolution 0.5 shows the best clustering result, so here we annotate the clusters from under that resolution
-    tme_labels = ["Macrophage", "SMA+ Stromal", "Stromal", "Macrophage", "SMA+ Stromal",
-                  "SMA+ Vim+ Stromal", "B-cell", "Stromal", "Endothelial", "Macrophage",
-                  "T-cell"]
-
-    # Update the labels to Anndata object
-    CLUSTER_KEY = "layer_2_0.5"
-    NEW_CLUSTER_KEY = "layer_2"
-    tme_map = dict(zip(range(len(tme_labels)), tme_labels))
-    adata_layer2_tme.obs[CLUSTER_KEY] = adata_layer2_tme.obs[CLUSTER_KEY].astype(int)
-    update_labels(adata_layer2_tme, NEW_CLUSTER_KEY, [tme_labels[i] for i in adata_layer2_tme.obs[CLUSTER_KEY]])
-
-    # Validation of first round cell type annotation
-    plot_zscore_cluster_mean_heatmap(adata_layer2_tme, LAYER_2_TME_MARKERS, NEW_CLUSTER_KEY,
-                                     OUT_DIR, vmax=1, vmin=-0.5, figsize=(7, 7), name=f"{NEW_CLUSTER_KEY}_tme")
-
-    # Update both epithelial and tmw cells into the overall adata
-    temp = np.zeros(len(adata)).astype(str)
-    temp[adata.obs.layer_1 == "Epithelial"] = adata_layer2_e.obs.layer_2
-    temp[adata.obs.layer_1 != "Epithelial"] = adata_layer2_tme.obs.layer_2
-    update_labels(adata, "layer_2", temp)
-
+    #
+    # adata_layer2_e = adata[:, LAYER_2_E_MARKERS].copy()
+    # adata_layer2_e = adata_layer2_e[adata_layer2_e.obs[CLUSTER_KEY] == "Epithelial"]
+    # adata_layer2_tme =adata[:, LAYER_2_TME_MARKERS].copy()
+    # adata_layer2_tme = adata_layer2_tme[adata_layer2_tme.obs[CLUSTER_KEY] != "Epithelial"]
+    #
+    # # layer 2 clustering: grid search on resolution
+    # RESOLUTIONS = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    #
+    # sc.pp.neighbors(adata_layer2_e, n_neighbors=15, use_rep='X_pca')
+    #
+    # # Grid search for clustering with different resolution
+    # for res in RESOLUTIONS:
+    #     CLUSTER_KEY = f'layer_2_{res:.1f}'
+    #     print(f"Resolution: {res:.1f}")
+    #
+    #     sc.tl.leiden(adata_layer2_e, resolution=res, key_added=CLUSTER_KEY)
+    #
+    #     print("Plotting")
+    #     plot_zscore_cluster_mean_heatmap(
+    #         adata=adata_layer2_e,
+    #         column_names=LAYER_2_E_MARKERS,
+    #         cluster_key=CLUSTER_KEY,
+    #         out_dir=OUT_DIR,
+    #         vmax=1.5,
+    #         vmin=-0.5,
+    #         figsize=(7, 7),
+    #         name=f'layer_2_{res:.1f}'
+    #     )
+    #
+    # METHOD = 'davies_bouldin'
+    # compare_clustering_resolutions(adata=adata_layer2_e,
+    #                                resolutions=RESOLUTIONS,
+    #                                method=METHOD)
+    #
+    # plot_compare_clustering_line(adata=adata_layer2_e,
+    #                              method=METHOD,
+    #                              out_dir=OUT_DIR,
+    #                              figsize=(7, 5),
+    #                              name="layer_2")
+    # # resolution 0.6 shows the best clustering result, so here we annotate the clusters from under that resolution
+    # e_labels = ["CK7+ Luminal", "CK5+ Basal", "CK+ Epithelial", "CK5+ Basal", "CK7+ Luminal",
+    #             "CK+ Epithelial", "CK5+ Basal", "CK+ Epithelial", "CK+ Epithelial", "CK5+ Basal",
+    #             "CK5+ Basal", "CK8/18+ Luminal"]
+    #
+    # # Update the labels to Anndata object
+    # CLUSTER_KEY = "layer_2_0.6"
+    # NEW_CLUSTER_KEY = "layer_2"
+    # e_map = dict(zip(range(len(e_labels)), e_labels))
+    # adata_layer2_e.obs[CLUSTER_KEY] = adata_layer2_e.obs[CLUSTER_KEY].astype(int)
+    # update_labels(adata_layer2_e, NEW_CLUSTER_KEY, [e_map[i] for i in adata_layer2_e.obs[CLUSTER_KEY]])
+    #
+    # # Validation of first round cell type annotation
+    # plot_zscore_cluster_mean_heatmap(adata_layer2_e, LAYER_2_E_MARKERS, NEW_CLUSTER_KEY,
+    #                                  OUT_DIR, vmax=1, vmin=-0.5, figsize=(7, 7), name=f"{NEW_CLUSTER_KEY}_e")
+    #
+    # # layer 2 clustering for tme group
+    # sc.pp.neighbors(adata_layer2_tme, n_neighbors=15, use_rep='X_pca')
+    #
+    # # Grid search for clustering with different resolution
+    # for res in RESOLUTIONS:
+    #     CLUSTER_KEY = f'layer_2_{res:.1f}'
+    #     print(f"Resolution: {res:.1f}")
+    #
+    #     #sc.tl.leiden(adata_layer2_tme, resolution=res, key_added=CLUSTER_KEY)
+    #
+    #     print("Plotting")
+    #     plot_zscore_cluster_mean_heatmap(
+    #         adata=adata_layer2_tme,
+    #         column_names=LAYER_2_TME_MARKERS,
+    #         cluster_key=CLUSTER_KEY,
+    #         out_dir=OUT_DIR,
+    #         vmax=2,
+    #         vmin=-1,
+    #         figsize=(7, 7),
+    #         name=f'layer_2_{res:.1f}'
+    #     )
+    #
+    # METHOD = 'davies_bouldin'
+    # compare_clustering_resolutions(adata=adata_layer2_tme,
+    #                                resolutions=RESOLUTIONS,
+    #                                method=METHOD)
+    #
+    # plot_compare_clustering_line(adata=adata_layer2_tme,
+    #                              method=METHOD,
+    #                              out_dir=OUT_DIR,
+    #                              figsize=(7, 5),
+    #                              name="layer_2")
+    # # resolution 0.5 shows the best clustering result, so here we annotate the clusters from under that resolution
+    # tme_labels = ["Macrophage", "SMA+ Stromal", "Stromal", "Macrophage", "SMA+ Stromal",
+    #               "SMA+ Vim+ Stromal", "B-cell", "Stromal", "Endothelial", "Macrophage",
+    #               "T-cell"]
+    #
+    # # Update the labels to Anndata object
+    # CLUSTER_KEY = "layer_2_0.5"
+    # NEW_CLUSTER_KEY = "layer_2"
+    # tme_map = dict(zip(range(len(tme_labels)), tme_labels))
+    # adata_layer2_tme.obs[CLUSTER_KEY] = adata_layer2_tme.obs[CLUSTER_KEY].astype(int)
+    # update_labels(adata_layer2_tme, NEW_CLUSTER_KEY, [tme_labels[i] for i in adata_layer2_tme.obs[CLUSTER_KEY]])
+    #
+    # # Validation of first round cell type annotation
+    # plot_zscore_cluster_mean_heatmap(adata_layer2_tme, LAYER_2_TME_MARKERS, NEW_CLUSTER_KEY,
+    #                                  OUT_DIR, vmax=1, vmin=-0.5, figsize=(7, 7), name=f"{NEW_CLUSTER_KEY}_tme")
+    #
+    # # Update both epithelial and tmw cells into the overall adata
+    # temp = np.zeros(len(adata)).astype(str)
+    # temp[adata.obs.layer_1 == "Epithelial"] = adata_layer2_e.obs.layer_2
+    # temp[adata.obs.layer_1 != "Epithelial"] = adata_layer2_tme.obs.layer_2
+    # update_labels(adata, "layer_2", temp)
+    #
     # Visualization
     CLUSTER_KEY = "layer_2"
     plot_zscore_cluster_mean_heatmap(adata, LAYER_2_E_MARKERS + LAYER_2_TME_MARKERS, CLUSTER_KEY,
@@ -286,20 +285,22 @@ if __name__ == '__main__':
     for roi in set(adata.obs.unique_img_key):
         temp_adata = adata[adata.obs["unique_img_key"] == roi]
         plot_spatial_cluster_distribution(adata=temp_adata, cluster_key=CLUSTER_KEY, out_dir=OUT_DIR,
-                                          color=LAYER2_CELL_TYPE_COLOR_DICT,
+                                          color=LAYER_2_CELL_TYPE_COLOR_DICT,
                                           figsize=(3.5, 3.5), dotsize=0.5, name=roi + "_L2")
-
-    # if the color list provided doesn't match to the cell type annotation, then use the default colour setting
-
-
-
 
     # After defining the cell types, we then move on to EDA (abundance)
     # Cell Counts
+    from src.visualize import plot_cell_area_count, plot_cluster_cell_count, plot_cell_area
+    CLUSTER_KEY = "layer_1"
+    plot_cluster_cell_count(adata, CLUSTER_KEY, OUT_DIR, figsize=(3.5, 2), name="ct_L1", dpi=150)
+    CLUSTER_KEY = "layer_2"
+    plot_cluster_cell_count(adata, CLUSTER_KEY, OUT_DIR, figsize=(3.5, 2), name="ct_L2", dpi=150)
 
     # Cell Area
+    plot_cell_area_count(adata, OUT_DIR, figsize=(3.5, 2), name=None)
 
     # Abundance of cell types
+
 
 
 
