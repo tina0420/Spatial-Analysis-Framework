@@ -264,7 +264,7 @@ def plot_spatial_cluster_distribution(adata, cluster_key, out_dir, figsize=(7, 7
     plt.clf()
 
 
-def plot_cluster_cell_count(adata, cluster_key, out_dir, figsize=(3.5, 2), name=None, dpi=100):
+def plot_cluster_cell_count(adata, cluster_key, out_dir, figsize=(3.5, 2), name=None, dpi=150):
     """
     :param adata: AnnData
     :param cluster_key: indicate which cluster key to use in obs, type: str
@@ -302,7 +302,7 @@ def plot_cluster_cell_count(adata, cluster_key, out_dir, figsize=(3.5, 2), name=
     plt.clf()
 
 
-def plot_cell_area_count(adata, out_dir, figsize=(3.5, 2), name=None):
+def plot_cell_area_count(adata, out_dir, figsize=(3.5, 2), name=None, dpi=150):
     cell_area = pd.DataFrame({"cell_area": adata.obs["area"]})
 
     fig, ax = plt.subplots(1, 1, figsize=figsize)
@@ -321,42 +321,9 @@ def plot_cell_area_count(adata, out_dir, figsize=(3.5, 2), name=None):
     plt.tight_layout()
 
     if name:
-        plt.savefig(out_dir / f"{name}_cell_area.png", dpi=500)
+        plt.savefig(out_dir / f"{name}_cell_area.png", dpi=dpi)
     else:
-        plt.savefig(out_dir / "cell_area.png", dpi=500)
-
-    plt.clf()
-
-
-def plot_cell_area(adata, out_dir, figsize=(3.5, 2), name=None):
-    """
-    :param adata: AnnData
-    :param out_dir: output path, type: Path
-    :param figsize: figure size, type: tuple
-    :param name: additional label for the file name, type: str
-    :return:
-    """
-    cell_area = pd.DataFrame({"cell_area": adata.obs["area"]})
-
-    fig, ax = plt.subplots(1, 1, figsize=figsize)
-
-    sns.histplot(data=cell_area, x="cell_area", binwidth=3)
-
-    plt.xlabel("Cell Area", fontsize=8)
-    plt.ylabel("Cell Count", fontsize=8)
-    plt.xticks(fontsize=8)
-    plt.yticks(fontsize=8)
-
-    plt.grid(alpha=0.1)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-
-    plt.tight_layout()
-
-    if name:
-        plt.savefig(out_dir / f"{name}_cell_area.png", dpi=500)
-    else:
-        plt.savefig(out_dir / "cell_area.png", dpi=500)
+        plt.savefig(out_dir / "cell_area.png", dpi=dpi)
 
     plt.clf()
 

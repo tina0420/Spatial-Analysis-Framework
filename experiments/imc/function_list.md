@@ -31,9 +31,16 @@
 
 ### visualization
 - `plot_marker_correlations_heatmap(out_dir, corr_df, figsize=(7, 7), name=None)`
-- ``
-- ``
-- ``
+- `plot_marker_nuclei_staining(marker_list, nuclei_name, in_dir, out_dir)`
+- `plot_marker_nuclear(x, out_dir, name)`
+- `plot_zscore_cluster_mean_heatmap(adata, column_names, cluster_key, out_dir, vmax=None, vmin=None, figsize=(7, 7),
+                                     name=None)`
+- `plot_compare_clustering_line(adata, method, out_dir, figsize=(5, 7), name=None)`
+- `plot_spatial_cluster_distribution(adata, cluster_key, out_dir, figsize=(7, 7), dotsize=1,
+                                      color=COLORS, name=None, dpi=150)`
+- `plot_cluster_cell_count(adata, cluster_key, out_dir, figsize=(3.5, 2), name=None, dpi=150)`
+- `plot_cell_area_count(adata, out_dir, figsize=(3.5, 2), name=None, dpi=150)`
+- 
 
 
 ### analysis_setup.py
