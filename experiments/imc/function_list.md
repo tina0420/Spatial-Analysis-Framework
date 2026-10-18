@@ -8,8 +8,6 @@
   kernel_size=3, norm_method="minmax", resize=False,
   plot_mask=False, plot_overlay=False, output_pred_df=False)`
 
-- ``
-- ``
 
 ### marker_quality_control.py
 - `run_qc(disease_type, experiment, exp_match=True, exp_plot=True, loc_match=False, loc_plot=True, intersection_plot=True)`
@@ -22,7 +20,7 @@
 - `run_clustering(adata, cluster_key, marker_list, method, resolution=1.0)`
 - `compare_clustering_resolutions(adata, resolutions, method)`
 
-### eda_abundance.py
+### eda.py
 - ``
 - ``
 

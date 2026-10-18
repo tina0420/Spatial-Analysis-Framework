@@ -9,6 +9,8 @@ from src.segment import *
 import shutil
 from scipy.stats import zscore
 from scipy.sparse import issparse
+from matplotlib.lines import Line2D
+import matplotlib.patches as patches
 
 # Color code panel if
 COLOR_CODE = ['#77b41f', '#b41f77', '#1f77b4', '#ff7f0e', '#ff9896', '#bd67bb', '#8c564b', '#fff80e',
@@ -332,6 +334,134 @@ def plot_cell_area_count(adata, out_dir, figsize=(3.5, 2), name=None, dpi=150):
 # Plotting neighbors
 plot_neighbor_graph(p_adata, out_dir, figsize=(7, 7), dotsize=1, linewidth=0.2, name=unique_id[i])
 """
+
+
+# Plot Cliff Delta (effect size)
+def plot_effect_size(delta_results_df, cluster_key, calculate_key, observation_order, observation_counts, observation_dict,
+                     out_dir, color_dict, figsize=(7, 7), name=None):
+    """
+    Plot effect size.
+    :param delta_results_df: cliff delta result, type: pd.DataFrame
+    :param cluster_key: indicate the column used in obs (e.g. cell type), type: str
+    :param calculate_key: indicate the column representing calculation result to plot in obs (e.g. cliff_delta), type: str
+    :param observation_order: indicate the column representing observation (outcome), type:str
+    :param out_dir: output directory, type: Path
+    :param color_dict: color dictionary for each category in cluster_key, type: dict
+    :param figsize: figure size, type: tuple
+    :param name: extra name for output file, type: str
+    :return:
+    """
+    # Reorder the dataframe by cliff's delta values
+    cal_df = delta_results_df.sort_values(by=calculate_key, ascending=False, inplace=False).reset_index(drop=True,
+                                                                                                        inplace=False)
+    plt.subplots(figsize=figsize)
+
+    # Compute the value of confidence interval
+    ci = [cal_df.iloc[::-1][calculate_key].values - cal_df.iloc[::-1]['lower_ci'].values,
+          cal_df.iloc[::-1]['upper_ci'].values - cal_df.iloc[::-1][calculate_key].values]
+
+    for i in range(cal_df.shape[0]):
+        # Give the significant results (p_value<0.05 lightblue, otherwise gray
+        if cal_df['adj_pvalue'].values[i] < 0.05:
+            plt.errorbar(x=cal_df.iloc[::-1][calculate_key][i],
+                         y=cal_df.iloc[::-1].index.values[i],
+                         xerr=[[ci[0][i]], [ci[1][i]]],
+                         color='black',
+                         capsize=5,
+                         linestyle='none',
+                         elinewidth=1,
+                         marker="o",
+                         markersize=15,
+                         mfc='lightblue',
+                         mec='lightblue')
+        else:
+            plt.errorbar(x=cal_df.iloc[::-1][calculate_key][i],
+                         y=cal_df.index.values[i],
+                         xerr=[[ci[0][i]], [ci[1][i]]],
+                         color='black',
+                         capsize=5,
+                         linestyle='none',
+                         elinewidth=1,
+                         marker="o",
+                         markersize=15,
+                         mfc='darkgray',
+                         mec='darkgray')
+
+    plt.axvline(x=0, linewidth=1.2, linestyle='--', color='gray')
+
+    # Get the max and min values from ci
+    x_left = int(min(cal_df.iloc[::-1]['lower_ci'].values) * 10) / 10.0
+    x_right = int(max(cal_df.iloc[::-1]['upper_ci'].values) * 10) / 10.0
+
+    if x_right == 1.0:
+        x_right = 1.0 + (1.0 - x_left)
+
+    # Set y-ticks and y-tick labels
+    plt.xticks([x_left, 0, x_right], fontsize=13)
+    plt.yticks(cal_df.iloc[::-1].index.values, cal_df.iloc[::-1][cluster_key], fontsize=13)
+    plt.xlabel("Cliff's delta effect size", fontsize=14)
+
+    # Remove the upper and right spines of the plot
+    ax = plt.gca()
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    # Get the coordinates for better setting the texts
+    x_min, x_max = ax.get_xlim()
+    y_min, y_max = ax.get_ylim()
+
+    # Create a rectangle representing the color strip for each category
+    color_strip_width = 0.05
+    for i, category in enumerate(cal_df[cluster_key]):
+        rect = patches.Rectangle((x_min, i - 0.4), color_strip_width, 0.98, linewidth=0,
+                                 edgecolor='none', facecolor=color_dict[category])
+        ax.add_patch(rect)
+
+    # Add the adj-pvalue on the right side of figure
+    ax.text(x_max, y_max + 0.2, "Adj. pval", va='center', ha='left', fontsize=16)
+    for idx, pvalue in enumerate(cal_df['adj_pvalue']):
+        if pvalue < 0.05:
+            exp = int(f"{pvalue:e}".split('e')[1])
+            mantissa = pvalue / (10 ** exp)
+            formatted_text = f"${mantissa:.1f} \\times 10^{{{exp}}}$"
+            ax.text(x_max, idx, formatted_text, va='center', ha='left', fontsize=15)
+        else:
+            ax.text(x_max, idx, f"{pvalue:.2f}", color='grey', va='center', ha='left', fontsize=15)
+
+    # Add legend showing the circles
+    legend_elements = [Line2D([0], [0], linestyle="-", color='black', gapcolor='black',
+                              marker="o", markeredgecolor='black', markerfacecolor='darkgray', label='n.s.'),
+
+                       Line2D([0], [0], linestyle="-", color='black', gapcolor='black',
+                              marker="o", markeredgecolor='black', markerfacecolor='lightblue', label='p < 0.05')]
+    ax.legend(handles=legend_elements, loc='lower left', bbox_to_anchor=(-0.5, -0.15))
+
+    # Add arrows on the upper region to show
+    ax.annotate('', xy=(x_min, (y_max)), xytext=(0, (y_max)),
+                arrowprops=dict(arrowstyle='->', lw=2, mutation_scale=20, color='blue'))
+    # ax.text((0 + x_min) / 2, y_max + 0.45, observation_order[1], va='center', ha='center', fontsize=15)
+    ax.text((0 + x_min) / 2, y_max + 0.66, f"{observation_dict[observation_order[1]]}\n(n={observation_counts[observation_order[1]]})",
+            va='center', ha='center', fontsize=15)
+
+    ax.annotate('', xy=(x_max, (y_max)), xytext=(0, (y_max)),
+                arrowprops=dict(arrowstyle='->', lw=2, mutation_scale=20, color='red'))
+    # ax.text((0 + x_max) / 2, y_max + 0.45, observation_order[0], va='center', ha='center', fontsize=15)
+    ax.text((0 + x_max) / 2, y_max + 0.66, f"{observation_dict[observation_order[0]]}\n(n={observation_counts[observation_order[0]]})",
+            va='center', ha='center', fontsize=15)
+
+    plt.tight_layout()
+
+    if name:
+        plt.savefig(out_dir / f"{name}_errorbar.png", dpi=500)
+    else:
+        plt.savefig(out_dir / "errorbar.png", dpi=500)
+
+    plt.clf()
+
+
+
+
+
 
 
 
