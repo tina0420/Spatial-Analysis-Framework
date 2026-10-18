@@ -13,6 +13,17 @@ from analysis_setup import *
 
 
 def compare_effect_size(adata, cluster_key, unit_key, observation_key, observation_order, cell_type_list, cell_type_len):
+    """
+    Run Cliff Delta for effect size comparison.
+    :param adata: Anndata object.
+    :param cluster_key: the column in
+    :param unit_key:
+    :param observation_key:
+    :param observation_order:
+    :param cell_type_list:
+    :param cell_type_len:
+    :return:
+    """
     ct_mtx = __calculate_cell_type_proportions(adata=adata,
                                                cluster_key=cluster_key,
                                                unit_key=unit_key,

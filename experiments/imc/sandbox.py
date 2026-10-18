@@ -13,7 +13,6 @@ from utils import update_labels
 from analysis_setup import *
 import numpy as np
 
-
 if __name__ == '__main__':
     # Directory setting
     EXPERIMENT = "imc_data"
@@ -291,6 +290,7 @@ if __name__ == '__main__':
     # After defining the cell types, we then move on to EDA (abundance)
     # Cell Counts
     from src.visualize import plot_cell_area_count, plot_cluster_cell_count, plot_cell_area
+
     CLUSTER_KEY = "layer_1"
     plot_cluster_cell_count(adata, CLUSTER_KEY, OUT_DIR, figsize=(3.5, 2), name="ct_L1", dpi=150)
     CLUSTER_KEY = "layer_2"
@@ -301,9 +301,45 @@ if __name__ == '__main__':
 
     # Abundance of cell types
 
+    # Cliff Delta (run and plot)
+    from spatial_analysis import compare_effect_size
+    from visualization import plot_effect_size
 
+    CLUSTER_KEY = "layer_2"
+    UNIT_KEY = "CID"
+    OBSERVATION_KEY = "Recurrence status"
+    OBSERVATION_ORDER = [1, 0]
+    CELL_TYPE_LIST = ['CK5+ Basal',  # Epithelial
+                      'CK7+ Luminal',
+                      'CK+ Epithelial',
+                      'T-cell',  # Immune
+                      'B-cell',
+                      'Macrophage',
+                      'Endothelial',  # Stromal
+                      'SMA+ Stromal',
+                      'SMA+ Vim+ Stromal',
+                      'Stromal'
+                      ]
+    ESI_CELL_TYPE_LENGTH = [3, 7]
+    ESI_CELL_TYPE_LENGTH = [3, 3, 4]
 
+    ct_mtx, delta_df = compare_effect_size(adata=adata, cluster_key=CLUSTER_KEY, unit_key=UNIT_KEY,
+                                           observation_key=OBSERVATION_KEY, observation_order=OBSERVATION_ORDER,
+                                           cell_type_list=CELL_TYPE_LIST, cell_type_len=ESI_CELL_TYPE_LENGTH)
 
+    # plotting
+    df = adata.obs[[OBSERVATION_KEY, "CID"]]
+    plot_effect_size(delta_results_df=delta_df,
+                     cluster_key=CLUSTER_KEY,
+                     calculate_key='cliff_delta',
+                     observation_order=OBSERVATION_ORDER,
+                     observation_counts=pd.Series(
+                         dict(zip(df.CID.values, df[OBSERVATION_KEY].values)).values()).value_counts(),
+                     observation_dict={0: 'No recurrence', 1: 'Recurrence'},
+                     color_dict=LAYER_2_CELL_TYPE_COLOR_DICT,
+                     out_dir=OUT_DIR,
+                     figsize=(8, 8),
+                     name="3types_Recurrence status_cliff_cell_type_cid")
 
 
 
