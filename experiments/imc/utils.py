@@ -19,7 +19,6 @@ def update_labels(adata, cluster_key, labels):
     adata.obs[cluster_key] = adata.obs[cluster_key].astype('category')
 
 
-
 def get_coexpression_matrix(exp_mtx, col_idxs):
     """
     Filter co-expression between all columns by Pearson correlation by thresholding.
@@ -40,10 +39,6 @@ def __calculate_coexpression_matrix(exp_mtx):
                       for a in combinations(range(exp_mtx.shape[1]), 2)])
 
     return r_mtx
-
-
-
-
 
 
 

@@ -11,6 +11,7 @@ from scipy.stats import zscore
 from scipy.sparse import issparse
 from matplotlib.lines import Line2D
 import matplotlib.patches as patches
+from scipy.cluster.hierarchy import linkage, leaves_list
 
 # Color code panel if
 COLOR_CODE = ['#77b41f', '#b41f77', '#1f77b4', '#ff7f0e', '#ff9896', '#bd67bb', '#8c564b', '#fff80e',
@@ -459,6 +460,80 @@ def plot_effect_size(delta_results_df, cluster_key, calculate_key, observation_o
     plt.clf()
 
 
+def plot_cell_type_prop_per_img_bar(adata, unit_key, cluster_key, color_dict, out_dir, cluster_key_order=None,
+                                    figsize=(50, 10), name=None, dpi=150):
+    """
+    Plot cluster proportion in bars.
+    :param adata: Anndata
+    :param unit_key: the column in obs representing the basic unit, type: str
+    :param cluster_key: the column in obs representing the cluster, type: str
+    :param color_dict: colour dictionary for the clusters, type: dict
+    :param out_dir: output directory, type: Path
+    :param cluster_key_order: the order of the clusters, type: list[str]
+    :param figsize: figure size, type: tuple
+    :param name: name of the output file, type: str
+    :param dpi: dpi setting for the output image, type: int
+    :return:
+    """
+    # Compute the proportion of each cell type
+    counts = adata.obs.pivot_table(
+        index=unit_key,
+        columns=cluster_key,
+        aggfunc='size',
+        fill_value=0
+    )
+    prop_df = counts.div(counts.sum(axis=1), axis=0)
+    # print(prop_df)
+
+    # Run hierachical clustering
+    Z = linkage(prop_df, method="complete", metric="euclidean")
+    # reorder the images based on clustering result
+    new_idx_order = leaves_list(Z)
+
+    if cluster_key_order:
+        new_order_df = prop_df.loc[prop_df.index[new_idx_order], cluster_key_order]
+    else:
+        new_order_df = prop_df.loc[prop_df.index[new_idx_order], :]
+
+    # plot
+    fig, ax = plt.subplots(1, 1, figsize=figsize)
+
+    # Plot stacked bars
+    bottom = np.zeros(new_order_df.shape[0])
+    for cell_type in new_order_df.columns:
+        bars = ax.bar(new_order_df.index, new_order_df[cell_type],
+                      bottom=bottom, color=color_dict[cell_type], label=cell_type)
+        bottom += new_order_df[cell_type].values
+
+    # Some setting for the figure
+    ax.spines['top'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+
+    ax.set_xticks(range(new_order_df.shape[0]))
+    ax.set_xticklabels(list(new_order_df.index), rotation=90, fontsize=30, va='top')
+    ax.set_xlim(-0.25, new_order_df.shape[0] - 0.75)
+    ax.tick_params(axis='x', pad=2)
+    plt.subplots_adjust(bottom=0.25)
+    ax.set_ylim(0, 1.05)
+    ax.set_yticks([0, 0.5, 1])
+    ax.tick_params(axis='y', labelsize=35)
+    ax.set_ylabel('Proportion', fontsize=35)
+
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles[::-1], labels[::-1], title="Cell Types", fontsize=30, title_fontsize=35,
+              bbox_to_anchor=(1.02, 0.5), loc='center left', frameon=False,
+              )
+
+    plt.tight_layout()
+
+    if name:
+        plt.savefig(out_dir / f"{name}_proportion_bar.png", dpi=dpi)
+    else:
+        plt.savefig(out_dir / "proportion_bar.png", dpi=dpi)
+
+    plt.clf()
 
 
 

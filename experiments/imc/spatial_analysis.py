@@ -12,6 +12,34 @@ import matplotlib.patches as patches
 from analysis_setup import *
 
 
+def run_shannon_entropy(adata, unit_key, cluster_key):
+    counts = adata.obs.pivot_table(
+        index=unit_key,
+        columns=cluster_key,
+        aggfunc='size',
+        fill_value=0
+    )
+    prop_df = counts.div(counts.sum(axis=1), axis=0)
+
+    # Shannon diversity
+    score_shannon = []
+    for i in range(prop_df.shape[0]):
+        score = __compute_spatial_entropy(prop_df.iloc[i, :])
+        score_shannon.append(score)
+
+    return score_shannon
+
+
+def __compute_spatial_entropy(p_list):
+    """
+    Compute spatial entropy for each cell
+    :param p_list: probabilities of all cell types among the neighbors of each cell
+    :return: entropy value
+    """
+    entropy = (-1) * sum([x * np.log(x) if x > 0 else 0 for x in p_list])
+    return entropy
+
+
 def compare_effect_size(adata, cluster_key, unit_key, observation_key, observation_order, cell_type_list, cell_type_len):
     """
     Run Cliff Delta for effect size comparison.

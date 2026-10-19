@@ -300,46 +300,69 @@ if __name__ == '__main__':
     plot_cell_area_count(adata, OUT_DIR, figsize=(3.5, 2), name=None)
 
     # Abundance of cell types
+    # Bars showing abundance across patients
+    from visualization import plot_cell_type_prop_per_img_bar
+    # layer_1 (ESI)
+    CLUSTER_KEY = "layer_1"
+    UNIT_KEY = 'CID'
+    CLUSTER_KEY_ORDER = list(ESI_CELL_TYPE_COLOR_DICT.keys())[::-1]
+    plot_cell_type_prop_per_img_bar(adata=adata, unit_key=UNIT_KEY, cluster_key=CLUSTER_KEY,
+                                    color_dict=ESI_CELL_TYPE_COLOR_DICT, out_dir=OUT_DIR,
+                                    cluster_key_order=CLUSTER_KEY_ORDER, figsize=(25, 15), name="L1_ct", dpi=150)
 
-    # Cliff Delta (run and plot)
-    from spatial_analysis import compare_effect_size
-    from visualization import plot_effect_size
-
+    # layer_2
     CLUSTER_KEY = "layer_2"
+    UNIT_KEY = 'CID'
+    CLUSTER_KEY_ORDER = list(LAYER_2_CELL_TYPE_COLOR_DICT.keys())[::-1]
+    plot_cell_type_prop_per_img_bar(adata=adata, unit_key=UNIT_KEY, cluster_key=CLUSTER_KEY,
+                                    color_dict=LAYER_2_CELL_TYPE_COLOR_DICT, out_dir=OUT_DIR,
+                                    cluster_key_order=CLUSTER_KEY_ORDER, figsize=(25, 15), name="L2_ct", dpi=150)
+
+    # Shannon Diversity
+    from spatial_analysis import run_shannon_entropy
     UNIT_KEY = "CID"
-    OBSERVATION_KEY = "Recurrence status"
-    OBSERVATION_ORDER = [1, 0]
-    CELL_TYPE_LIST = ['CK5+ Basal',  # Epithelial
-                      'CK7+ Luminal',
-                      'CK+ Epithelial',
-                      'T-cell',  # Immune
-                      'B-cell',
-                      'Macrophage',
-                      'Endothelial',  # Stromal
-                      'SMA+ Stromal',
-                      'SMA+ Vim+ Stromal',
-                      'Stromal'
-                      ]
-    ESI_CELL_TYPE_LENGTH = [3, 7]
-    ESI_CELL_TYPE_LENGTH = [3, 3, 4]
+    CLUSTER_KEY = "layer_2"
+    entropy_score = run_shannon_entropy(adata=adata, unit_key=UNIT_KEY, cluster_key=CLUSTER_KEY)
 
-    ct_mtx, delta_df = compare_effect_size(adata=adata, cluster_key=CLUSTER_KEY, unit_key=UNIT_KEY,
-                                           observation_key=OBSERVATION_KEY, observation_order=OBSERVATION_ORDER,
-                                           cell_type_list=CELL_TYPE_LIST, cell_type_len=ESI_CELL_TYPE_LENGTH)
-
-    # plotting
-    df = adata.obs[[OBSERVATION_KEY, "CID"]]
-    plot_effect_size(delta_results_df=delta_df,
-                     cluster_key=CLUSTER_KEY,
-                     calculate_key='cliff_delta',
-                     observation_order=OBSERVATION_ORDER,
-                     observation_counts=pd.Series(
-                         dict(zip(df.CID.values, df[OBSERVATION_KEY].values)).values()).value_counts(),
-                     observation_dict={0: 'No recurrence', 1: 'Recurrence'},
-                     color_dict=LAYER_2_CELL_TYPE_COLOR_DICT,
-                     out_dir=OUT_DIR,
-                     figsize=(8, 8),
-                     name="3types_Recurrence status_cliff_cell_type_cid")
+    # # Cliff Delta (run and plot)
+    # from spatial_analysis import compare_effect_size
+    # from visualization import plot_effect_size
+    #
+    # CLUSTER_KEY = "layer_2"
+    # UNIT_KEY = "CID"
+    # OBSERVATION_KEY = "Recurrence status"
+    # OBSERVATION_ORDER = [1, 0]
+    # CELL_TYPE_LIST = ['CK5+ Basal',  # Epithelial
+    #                   'CK7+ Luminal',
+    #                   'CK+ Epithelial',
+    #                   'T-cell',  # Immune
+    #                   'B-cell',
+    #                   'Macrophage',
+    #                   'Endothelial',  # Stromal
+    #                   'SMA+ Stromal',
+    #                   'SMA+ Vim+ Stromal',
+    #                   'Stromal'
+    #                   ]
+    # ESI_CELL_TYPE_LENGTH = [3, 7]
+    # ESI_CELL_TYPE_LENGTH = [3, 3, 4]
+    #
+    # ct_mtx, delta_df = compare_effect_size(adata=adata, cluster_key=CLUSTER_KEY, unit_key=UNIT_KEY,
+    #                                        observation_key=OBSERVATION_KEY, observation_order=OBSERVATION_ORDER,
+    #                                        cell_type_list=CELL_TYPE_LIST, cell_type_len=ESI_CELL_TYPE_LENGTH)
+    #
+    # # plotting
+    # df = adata.obs[[OBSERVATION_KEY, "CID"]]
+    # plot_effect_size(delta_results_df=delta_df,
+    #                  cluster_key=CLUSTER_KEY,
+    #                  calculate_key='cliff_delta',
+    #                  observation_order=OBSERVATION_ORDER,
+    #                  observation_counts=pd.Series(
+    #                      dict(zip(df.CID.values, df[OBSERVATION_KEY].values)).values()).value_counts(),
+    #                  observation_dict={0: 'No recurrence', 1: 'Recurrence'},
+    #                  color_dict=LAYER_2_CELL_TYPE_COLOR_DICT,
+    #                  out_dir=OUT_DIR,
+    #                  figsize=(8, 8),
+    #                  name="3types_Recurrence status_cliff_cell_type_cid")
 
 
 
