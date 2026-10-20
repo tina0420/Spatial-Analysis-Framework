@@ -24,7 +24,10 @@
 - ``
 - ``
 
-
+### spatial_analysis.py
+- `run_shannon_entropy(adata, unit_key, cluster_key)`
+- `compare_effect_size(adata, cluster_key, unit_key, observation_key, observation_order, cell_type_list, cell_type_len)`
+- 
 
 
 ### visualization

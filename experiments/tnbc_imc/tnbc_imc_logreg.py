@@ -17,7 +17,6 @@ from sklearn.model_selection import LeaveOneOut
 from sklearn.preprocessing import StandardScaler
 import statsmodels.api as sm
 from sklearn.metrics import roc_auc_score, average_precision_score, roc_curve, precision_recall_curve, auc
-from experiments.tnbc_imc.tnbc_imc_setup_analysis import *
 from experiments.tnbc_imc.tnbc_imc_setup_analysis_e import *
 
 
@@ -81,7 +80,7 @@ def run_logistic_regression(df, features):
     return inference_df
 
 
-def plot_odds_ratio(inference_df, model_type, figsize, out_dir, name):
+def plot_odds_ratio(inference_df, model_type, out_dir, figsize=(9, 4), name=None, dpi=150):
     """
     Plot
     """
@@ -187,9 +186,9 @@ def plot_odds_ratio(inference_df, model_type, figsize, out_dir, name):
     plt.tight_layout()
     if "/" in name:
         temp_name = name.replace("/", "_")
-        plt.savefig(out_dir / f"{temp_name}_OR.png", dpi=300)
+        plt.savefig(out_dir / f"{temp_name}_OR.png", dpi=dpi)
     else:
-        plt.savefig(out_dir / f"{name}_OR.png", dpi=300)
+        plt.savefig(out_dir / f"{name}_OR.png", dpi=dpi)
     plt.clf()
 
 

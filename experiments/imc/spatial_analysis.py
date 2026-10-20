@@ -238,7 +238,11 @@ def __calculate_odds_ratio(group1_list, group2_list):
     return (a * d) / (b * c)
 
 
-def quantify_tumour_infiltrate_lymphocyte():
+def quantify_tumour_infiltrate_lymphocyte_types():
+    pass
+
+
+def quantify_tumour_infiltrate_lymphocyte_counts():
     pass
 
 

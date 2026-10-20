@@ -299,6 +299,11 @@ if __name__ == '__main__':
     # Cell Area
     plot_cell_area_count(adata, OUT_DIR, figsize=(3.5, 2), name=None)
 
+    # Expression distribution of cell types
+    from visualization import plot_marker_intensity_across_clusters
+    plot_marker_intensity_across_clusters(adata, adata.var_names, "layer_2", OUT_DIR,
+                                          list(LAYER_2_CELL_TYPE_COLOR_DICT.keys()), dpi=150)
+
     # Abundance of cell types
     # Bars showing abundance across patients
     from visualization import plot_cell_type_prop_per_img_bar
@@ -365,4 +370,12 @@ if __name__ == '__main__':
     #                  name="3types_Recurrence status_cliff_cell_type_cid")
 
 
+
+
+
+    # logistic regression model
+    from prediction import run_logistic_regression
+    from visualization import plot_odds_ratio
+    log_df = run_logistic_regression(df, features)
+    plot_odds_ratio(log_df, "multivariate", (9, 4), OUT_DIR, "Multivariate_plot_together")
 

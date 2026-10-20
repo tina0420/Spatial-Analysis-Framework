@@ -12,6 +12,7 @@ from scipy.sparse import issparse
 from matplotlib.lines import Line2D
 import matplotlib.patches as patches
 from scipy.cluster.hierarchy import linkage, leaves_list
+from sklearn.metrics import roc_curve, auc
 
 # Color code panel if
 COLOR_CODE = ['#77b41f', '#b41f77', '#1f77b4', '#ff7f0e', '#ff9896', '#bd67bb', '#8c564b', '#fff80e',
@@ -460,6 +461,40 @@ def plot_effect_size(delta_results_df, cluster_key, calculate_key, observation_o
     plt.clf()
 
 
+def plot_marker_intensity_across_clusters(adata, marker_list, cluster_key, out_dir, cluster_order=None, dpi=150):
+    """
+    Plot marker intensity across clusters in boxplot.
+    :param adata: Anndata
+    :param marker_list: list of markers, type: list[str]
+    :param cluster_key: column in adata.obs representing the cluster, type: str
+    :param out_dir: output directory, type: Path
+    :param cluster_order: order of the clusters to show on the figure, type: list[str]
+    :param dpi: dpi setting, type: int
+    :return:
+    """
+    for marker in marker_list:
+        idx = np.where(adata.var_names == marker)[0][0]
+        exp = adata.X[:, idx]
+
+        # Make a df of the marker to plot (cell_type, expression)
+        df = pd.DataFrame({"cell_type": list(adata.obs[cluster_key]),
+                           "expression": list(exp)})
+
+        fig, ax = plt.subplots(1, 1, figsize=(12, 9))
+
+        sns.boxplot(data=df, x="cell_type", y="expression", order=cluster_order, color="lightblue", ax=ax)
+
+        sns.despine(ax=ax, top=True, right=True)
+        plt.xlabel("Cell type", fontsize=20)
+        plt.xticks(fontsize=15, rotation=90)
+        plt.ylabel(f"{marker} intensity", fontsize=20)
+
+        plt.tight_layout()
+        plt.savefig(out_dir / f"{marker}_exp_cell_type.png", dpi=dpi)
+
+        plt.clf()
+
+
 def plot_cell_type_prop_per_img_bar(adata, unit_key, cluster_key, color_dict, out_dir, cluster_key_order=None,
                                     figsize=(50, 10), name=None, dpi=150):
     """
@@ -539,4 +574,146 @@ def plot_cell_type_prop_per_img_bar(adata, unit_key, cluster_key, color_dict, ou
 
 
 
+### Features correlations and model
+def plot_feature_correlation(corr_matrix, out_dir, figsize=(13, 12), dpi=150):
+    """
+    Plots a lower-triangle heatmap for feature correlation.
+    :param corr_matrix: correlation matrix, type: pd.DataFrame
+    :param out_dir: output directory, type: Path
+    :param figsize: figure size, type: tuple
+    :param dpi: dpi setting, type: int
+    :return:
+    """
+
+    # Hide the upper triangle
+    mask = np.triu(np.ones_like(corr_matrix, dtype=bool))
+
+    fig, ax = plt.subplots(figsize=figsize)
+    cmap = sns.diverging_palette(230, 20, as_cmap=True)
+
+    # Heatmap
+    sns.heatmap(corr_matrix,
+                mask=mask,
+                cmap=cmap,
+                vmax=1.0,
+                vmin=-1.0,
+                center=0,
+                square=True,
+                linewidths=.5,
+                cbar_kws={"shrink": 0.5, "ticks": [-1.0, -0.5, 0.0, 0.5, 1.0],
+                          "label": "Spearman Correlation Coefficient"},
+                annot=True,
+                fmt=".2f",
+                annot_kws={"size": 16},
+                ax=ax)
+
+    ax.tick_params(axis='x', labelsize=15)
+    ax.tick_params(axis='y', labelsize=15)
+    ax.set_title(f'Feature Correlation Matrix', fontsize=25, pad=15)
+
+    plt.tight_layout()
+    plt.savefig(out_dir / "feature_correlation.png", dpi=dpi)
+
+    plt.clf()
+
+
+def plot_roc_curve(y, y_pred_probs, out_dir, figsize=(6, 5), name=None, dpi=150):
+    fig, ax1 = plt.subplots(1, 1, figsize=figsize)
+
+    # AUROC
+    fpr, tpr, _ = roc_curve(y, y_pred_probs)
+    roc_auc = auc(fpr, tpr)
+
+    ax1.plot(fpr, tpr, color='#d62728', lw=2, label=f'AUC = {roc_auc:.2f}')
+    ax1.plot([0, 1], [0, 1], color='gray', lw=1, linestyle='--')  # Random chance line
+    ax1.set_xlim([0.0, 1.0])
+    ax1.set_ylim([0.0, 1.05])
+    ax1.set_xlabel('False Positive Rate')
+    ax1.set_ylabel('True Positive Rate')
+    ax1.set_title('Receiver Operating Characteristic (ROC)')
+    ax1.legend(loc="lower right")
+    ax1.grid(alpha=0.3)
+
+    plt.tight_layout()
+    if "/" in name:
+        temp_name = name.replace("/", "_")
+        plt.savefig(out_dir / f"{temp_name}_ROC.png", dpi=dpi)
+    else:
+        plt.savefig(out_dir / f"{name}_ROC.png", dpi=dpi)
+
+    plt.clf()
+
+
+# odds ratio plot
+def plot_odds_ratio(inference_df, model_type, out_dir, figsize=(9, 4), name=None, dpi=150):
+    """
+    PLot odds ratio.
+    :param inference_df: odds ratio matrix, type: pd.DataFrame
+    :param model_type: type of model, univariate or multivariate, type: str
+    :param out_dir: output directory, type: Path
+    :param figsize: figure size, type: tuple
+    :param name: name of the figure, type: str
+    :param dpi: dpi setting, type: int
+    :return:
+    """
+    # Set global plot style for publication-quality figures
+    plt.rcParams.update({'font.size': 12, 'font.family': 'sans-serif'})
+
+    plot_df = inference_df.sort_values(by='Odds Ratio', ascending=True).reset_index(drop=True)
+
+    y_pos = np.arange(len(plot_df))
+    ors = plot_df['Odds Ratio']
+    lowers = plot_df['95% CI Lower']
+    uppers = plot_df['95% CI Upper']
+    pvals = plot_df['p-val']
+    feature_names = plot_df['Features']
+
+    # Define colors based on significance
+    colors = []
+    for o, p in zip(ors, pvals):
+        if p >= 0.05:
+            colors.append('#808080')  # Non-significant (background noise)
+        elif o > 1:
+            colors.append('#d62728')  # Significant Risk Factor (Red)
+        else:
+            colors.append('#1f77b4')  # Significant Protective Factor (Blue)
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # 95% CI
+    xerr_lower = ors - lowers
+    xerr_upper = uppers - ors
+
+    ax.errorbar(ors, y_pos, xerr=[xerr_lower, xerr_upper],
+                fmt='none', ecolor="gray", capsize=6, elinewidth=3.5, zorder=2)
+
+    # Odds Ratios
+    ax.scatter(ors, y_pos, color=colors, s=110, zorder=2)
+
+    ax.axvline(x=1.0, color='black', linestyle='--', lw=1.5, zorder=0)
+
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(feature_names, fontsize=14, va='center')
+    ax.set_xscale('log')
+    ax.set_xlabel('Odds Ratio (Log Scale)', fontsize=13)
+    if model_type == "univariate":
+        ax.set_title('Univariate Predictor of Recurrence', weight="bold", fontsize=13)
+    elif model_type == "multivariate":
+        ax.set_title('Multivariate Predictor of Recurrence', weight="bold", fontsize=13)
+
+    for i in range(len(y_pos)):
+        p_str = "p < 0.01" if pvals[i] < 0.01 else f"p = {pvals[i]:.2f}"
+        anno_text = f"{p_str}"
+        ax.text(1.02, y_pos[i], anno_text, transform=ax.get_yaxis_transform(),
+                va='center', ha='left', fontsize=13, color=colors[i])
+
+    plt.xticks(fontsize=10)
+    plt.tight_layout()
+    if "/" in name:
+        temp_name = name.replace("/", "_")
+        plt.savefig(out_dir / f"{temp_name}_OR.png", dpi=dpi)
+    else:
+        plt.savefig(out_dir / f"{name}_OR.png", dpi=dpi)
+
+    plt.clf()
 
