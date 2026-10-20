@@ -5,6 +5,9 @@ A package for integrated spatial analysis for single-cell digital pathology.
 
 @ Tina Hsu, 2025.
 
+## Overview of the analysis framework
+<img width="1074" height="617" alt="spatial-framework-fig" src="https://github.com/user-attachments/assets/25a26400-584a-4505-9beb-6df2b920e7ed" />
+
 ## Installation
 Clone this repo
 ```commandline
