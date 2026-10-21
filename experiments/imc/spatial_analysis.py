@@ -2,17 +2,56 @@
 @author: Tina Hsu
 Spatial functions.
 """
+import os
 import pandas as pd
 import numpy as np
 from scipy.stats import mannwhitneyu
+import math
+from src.spatial_stats import get_interacting_pairs
+from scipy.spatial.distance import squareform, pdist
 from statsmodels.stats.multitest import multipletests
-import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
-import matplotlib.patches as patches
-from analysis_setup import *
+import warnings
+
+
+def read_neighbors(adata, rel_path="rel.csv", threshold=30):
+    """
+    Read neighbors.
+    :param adata: AnnData
+    :param rel_path: path to relation matrix, type:str
+    :param threshold: threshold, type: float
+    :return:
+    """
+    if os.path.exists(rel_path):
+        rel_df = pd.read_csv(rel_path)
+        adata.uns["relation"] = rel_df.values
+    else:
+        adata.uns["relation"] = __construct_relations(adata.obsm["spatial"], threshold=threshold)
+        adata.uns["threshold"] = threshold
+        warnings.warn("Constructing relations since no rel file was found.")
+
+
+def __construct_relations(loc, threshold):
+    """
+    Constructs relations based on pairwise distance thresholding
+    :param loc: location, type: numpy matrix
+    :param threshold: threshold for pairwise distance, type: float
+    :return: matrix of indices of cells neighbouring each other, type: numpy matrix
+    """
+    pairwise_distance = squareform(pdist(loc))
+    adjacency_matrix = np.where(pairwise_distance > threshold, 0, pairwise_distance)
+    edge_indices = np.array(np.nonzero(np.triu(adjacency_matrix))).T
+
+    return edge_indices
 
 
 def run_shannon_entropy(adata, unit_key, cluster_key):
+    """
+    Run Sharron diversity.
+    :param adata: AnnData
+    :param unit_key: the column of adata.obs representing units, type: str
+    :param cluster_key: the column of adata.obs representing clusters, type: str
+    :return: list of shannon entropy scores, type: list[float]
+    """
     counts = adata.obs.pivot_table(
         index=unit_key,
         columns=cluster_key,
@@ -33,14 +72,15 @@ def run_shannon_entropy(adata, unit_key, cluster_key):
 def __compute_spatial_entropy(p_list):
     """
     Compute spatial entropy for each cell
-    :param p_list: probabilities of all cell types among the neighbors of each cell
+    :param p_list: probabilities of all cell types among the neighbours of each cell
     :return: entropy value
     """
     entropy = (-1) * sum([x * np.log(x) if x > 0 else 0 for x in p_list])
     return entropy
 
 
-def compare_effect_size(adata, cluster_key, unit_key, observation_key, observation_order, cell_type_list, cell_type_len):
+def compare_effect_size(adata, cluster_key, unit_key, observation_key, observation_order, cell_type_list,
+                        cell_type_len):
     """
     Run Cliff Delta for effect size comparison.
     :param adata: Anndata object.
@@ -127,13 +167,14 @@ def __calculate_cell_type_proportions(adata, cluster_key, unit_key, observation_
 
 
 def __run_cliffs_delta(calculate_df, cluster_key, observation_key, observation_order, stats_type, n_boot=1000,
-                       ci_num=95,
-                       ran_seed=57):
+                       ci_num=95, ran_seed=57):
     """
     Running Cliff's Delta.
     :param calculate_df: data prepared for cliff delta (e.g. cell type proportions), type: pd.DataFrame
     :param cluster_key: indicate the column used in obs, type: str
     :param observation_key: indicate the column representing observation (outcome), type:str
+    :param observation_order: , type:list[str]
+    :param stats_type: indicate the column representing observation (outcome), type:str
     :param n_boot: number for bootstrapping, type: int
     :param ci_num: number of confident interval, type: float
     :param ran_seed: randon seed number used in bootstrap, type:int
@@ -238,8 +279,142 @@ def __calculate_odds_ratio(group1_list, group2_list):
     return (a * d) / (b * c)
 
 
-def quantify_tumour_infiltrate_lymphocyte_types():
-    pass
+def get_cell_radius(adata, unit_key):
+    """
+    Get the median radius of cells in the images.
+    :param adata: AnnData
+    :param unit_key: the column of adata.obs representing each unit, type: str
+    :return: median radius of cells, type: float
+    """
+    radius_list = []
+    for pid in pd.unique(adata.obs[unit_key]):
+        p_adata = adata[np.where(adata.obs[unit_key] == pid)[0], :]
+        radius = np.sqrt(p_adata.obs.area / np.pi)
+        radius_list.append(math.ceil(pd.Series(radius).value_counts().index[0]) * 2)
+
+    return np.median(radius_list)
+
+
+def quantify_tumour_infiltrate_lymphocyte_categories(adata, unit_key, observation_key, cluster_key, cell_types,
+                                                     target_cell, tils_types, threshold):
+    """
+    Quantify tumour infiltrating lymphocytes into categories, infiltrating, bystanding and ignored.
+    :param adata: AnnData
+    :param unit_key: the column of adata.obs representing each unit, type: str
+    :param observation_key: the column of adata.obs representing observations, type: str
+    :param cluster_key: the column of adata.obs representing clusters, type: str
+    :param cell_types:  list of immune cell types to calculate TILs, type: list[str]
+    :param target_cell: target cell to calculate TILs, type: str
+    :param tils_types: list of TILs categories, type: list[str]
+    :param threshold: cell radius threshold, type: float
+    :return:
+    """
+    result = {}
+    infiltrating_labels = {}
+
+    for pid in np.unique(adata.obs[unit_key]):
+        print(pid)
+        result[pid] = {}
+        infiltrating_labels[pid] = {}
+
+        p_adata = adata[np.where(adata.obs[unit_key] == pid)[0], :]
+
+        # # Read the neighbors whose distances are in the threshold
+        # read_neighbors(p_adata, rel_path=out_dir / "rel.csv", threshold=threshold)
+
+        for cell_type in cell_types:
+            print(cell_type)
+            if cell_type == 'Immune':
+                result[pid][cell_type] = {}
+
+                # Count edges from Epithelial and Immune (for esi)
+                interactions = get_interacting_pairs(p_adata, cluster_key='layer_1',
+                                                     type_i=target_cell, type_j=cell_type)
+
+                # Compute the number of neighbor does each immune cell has
+                infiltrating = []
+                bystanding = []
+                ignored = []
+                tils_labels = p_adata.obs['layer_1'].to_list()
+                for idx in np.where(p_adata.obs['layer_1'] == cell_type)[0]:
+                    # When the cell has 3 or more tumour neighbors
+                    if np.sum(interactions.flatten() == idx) >= 3:
+                        infiltrating.append(idx)
+                        tils_labels[idx] = 'Infiltrating'
+                    # When the cell has one or two tumour neighbors
+                    elif (np.sum(interactions.flatten() == idx) == 2) | (np.sum(interactions.flatten() == idx) == 1):
+                        bystanding.append(idx)
+                        tils_labels[idx] = 'Bystanding'
+                    # When the cell has no tumour neighbors
+                    else:
+                        ignored.append(idx)
+                        tils_labels[idx] = 'Ignored'
+
+                result[pid][cell_type][tils_types[0]] = infiltrating
+                result[pid][cell_type][tils_types[1]] = bystanding
+                result[pid][cell_type][tils_types[2]] = ignored
+
+                infiltrating_labels[pid][cell_type] = tils_labels
+
+            else:
+                result[pid][cell_type] = {}
+
+                # Count edges between the cell type and the target cell type (e.g. T Cell and Epithelial)
+                interactions = get_interacting_pairs(p_adata, cluster_key=cluster_key,
+                                                     type_i=target_cell, type_j=cell_type)
+
+                # Compute the number of neighbor does each immune cell have
+                infiltrating = []
+                bystanding = []
+                ignored = []
+                tils_labels = p_adata.obs['ESI'].to_list()
+                for idx in np.where(p_adata.obs[cluster_key] == cell_type)[0]:
+                    # When the cell has 3 or more tumour neighbors
+                    if np.sum(interactions.flatten() == idx) >= 3:
+                        infiltrating.append(idx)
+                        tils_labels[idx] = 'Infiltrating'
+                    # When the cell has one or two tumour neighbors
+                    elif (np.sum(interactions.flatten() == idx) == 2) | (np.sum(interactions.flatten() == idx) == 1):
+                        bystanding.append(idx)
+                        tils_labels[idx] = 'Bystanding'
+                    # When the cell has no tumour neighbors
+                    else:
+                        ignored.append(idx)
+                        tils_labels[idx] = 'Ignored'
+
+                result[pid][cell_type][tils_types[0]] = infiltrating
+                result[pid][cell_type][tils_types[1]] = bystanding
+                result[pid][cell_type][tils_types[2]] = ignored
+
+                infiltrating_labels[pid][cell_type] = tils_labels
+
+    # Compute the percentages of each tils categories for different cell types
+    print("compute the percentage")
+    infiltrating_calculation = []
+
+    for pid, info in result.items():
+        observation = adata.obs[adata.obs[unit_key] == pid][observation_key].values[0]
+        info_to_add = [pid, observation]
+        for cell_type in cell_types:
+            total_count = (len(info[cell_type][tils_types[0]]) + len(info[cell_type][tils_types[1]]) +
+                           len(info[cell_type][tils_types[2]]))
+            if total_count == 0:
+                info_to_add.append(0)
+                info_to_add.append(0)
+                info_to_add.append(0)
+            else:
+                info_to_add.append(len(info[cell_type][tils_types[0]]) / total_count)
+                info_to_add.append(len(info[cell_type][tils_types[1]]) / total_count)
+                info_to_add.append(len(info[cell_type][tils_types[2]]) / total_count)
+
+        infiltrating_calculation.append(info_to_add)
+
+    # Create a new dataframe for the infiltration result
+    infiltrating_df = pd.DataFrame(infiltrating_calculation,
+                                   columns=[unit_key, observation_key] +
+                                           [f"{ct}_{tils}" for ct in cell_types for tils in tils_types])
+
+    return result, infiltrating_df, infiltrating_labels
 
 
 def quantify_tumour_infiltrate_lymphocyte_counts():

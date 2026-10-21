@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from segmentation import stack_for_mesmer
 from src.segment import *
+from src.utils import *
 import shutil
 from scipy.stats import zscore
 from scipy.sparse import issparse
@@ -27,6 +28,117 @@ COLOR_CODE = ['#77b41f', '#b41f77', '#1f77b4', '#ff7f0e', '#ff9896', '#bd67bb', 
               ]
 
 COLORS = dict(zip(range(len(COLOR_CODE)), COLOR_CODE))
+
+
+def plot_umap(adata, cluster_key, out_dir, color_dict=COLORS, figsize=(7, 7), dotsize=1, name=None):
+    """
+    :param adata: AnnData
+    :param cluster_key: indicate which cluster key to use in obs, type: str
+    :param out_dir: output path, type: Path
+    :param color_dict: color dictionary for plotting, type: dict
+    :param figsize: figure size, type: tuple
+    :param dotsize: dot size, type: float
+    :param name: additional label for the file name, type: str
+    :return:
+    """
+    labels = adata.obs[cluster_key].values
+    label_categories = adata.obs[cluster_key].cat.categories
+    is_digit_labels = all(str(e).isdigit() for e in labels)
+
+    fig, ax = plt.subplots(1, 1, figsize=figsize)
+
+    for i in range(len(label_categories)):
+        lbl_idxs = np.where(labels == label_categories[i])[0]
+
+        if color_dict:
+            ax.scatter(adata.obsm["X_umap"][:, 0][lbl_idxs], adata.obsm["X_umap"][:, 1][lbl_idxs],
+                       c=color_dict[label_categories[i]], s=dotsize, label=label_categories[i])
+        else:
+            if is_digit_labels:
+                ax.scatter(adata.obsm["X_umap"][:, 0][lbl_idxs], adata.obsm["X_umap"][:, 1][lbl_idxs],
+                           c=COLORS[int(label_categories[i])], s=dotsize, label=label_categories[i])
+            else:
+                ax.scatter(adata.obsm["X_umap"][:, 0][lbl_idxs], adata.obsm["X_umap"][:, 1][lbl_idxs],
+                           c=COLORS[i], s=dotsize, label=label_categories[i])
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.xaxis.set_tick_params(labelbottom=False)
+    ax.yaxis.set_tick_params(labelleft=False)
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+    plt.xlabel("UMAP1", fontsize=8)
+    plt.ylabel("UMAP2", fontsize=8)
+
+    plt.legend(prop={'size': 8}, loc='upper right', bbox_to_anchor=(1.12, 1.1))
+
+    plt.tight_layout()
+
+    if name:
+        plt.savefig(out_dir / f"{name}_umap.png", dpi=500)
+    else:
+        plt.savefig(out_dir / "umap.png", dpi=500)
+    plt.clf()
+
+
+def plot_umap_panel(adata, cluster_key, out_dir, color_dict=COLORS, dotsize=0.1, show_counts=False, name=None, dpi=300):
+    """
+    :param adata: AnnData
+    :param cluster_key: indicate which cluster key to use in obs, type: str
+    :param out_dir: output path, type: Path
+    :param color_dict: color dictionary for plotting, type: dict
+    :param dotsize: dot size, type: float
+    :param show_counts: show the counts of each label or not, type: bool
+    :param name: additional label for the file name, type: str
+    :return:
+    """
+    labels = adata.obs[cluster_key].values
+    label_categories = adata.obs[cluster_key].cat.categories
+    is_digit_labels = all(str(e).isdigit() for e in labels)
+    rows = len(construct_range(len(pd.unique(labels)) - 1, 5))
+    # fig, axes = plt.subplots(rows, 5, figsize=(7, rows * 1.4))
+    fig, axes = plt.subplots(rows, 4, figsize=(10, rows * 1.7))
+    for i, ax in enumerate(fig.axes):
+        if i > len(pd.unique(labels)) - 1:
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['bottom'].set_visible(False)
+            ax.spines['left'].set_visible(False)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            continue
+        lbl_idxs = np.where(labels == label_categories[i])[0]
+        non_lbl_idxs = np.where(labels != label_categories[i])[0]
+        subset = adata.obsm["X_umap"][lbl_idxs]
+        inv_subset = adata.obsm["X_umap"][non_lbl_idxs]
+        # Plot the background
+        ax.scatter(inv_subset[:, 0], inv_subset[:, 1], s=dotsize, c="#e0e0e0")
+        if color_dict:
+            ax.scatter(subset[:, 0], subset[:, 1], s=dotsize, c=color_dict[label_categories[i]])
+        else:
+            if is_digit_labels:
+                ax.scatter(subset[:, 0], subset[:, 1], s=dotsize, c=COLORS[int(label_categories[i])])
+            else:
+                ax.scatter(subset[:, 0], subset[:, 1], s=dotsize, c=COLORS[i])
+        ax.grid(False)
+        ax.xaxis.set_tick_params(labelbottom=False)
+        ax.yaxis.set_tick_params(labelleft=False)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        if show_counts:
+            ax.set_title(
+                label_categories[i] + " (n=" + str(adata.obs[cluster_key].value_counts()[label_categories[i]]) + ")",
+                weight="bold", fontsize=10)
+        else:
+            ax.set_title(
+                label_categories[i], weight="bold", fontsize=10)
+    plt.tight_layout()
+    if name:
+        plt.savefig(out_dir / f"{name}_umap_panel.png", dpi=dpi)
+    else:
+        plt.savefig(out_dir / "umap_panel.png", dpi=dpi)
+    plt.clf()
 
 
 def plot_marker_correlations_heatmap(out_dir, corr_df, figsize=(7, 7), name=None):
@@ -569,6 +681,91 @@ def plot_cell_type_prop_per_img_bar(adata, unit_key, cluster_key, color_dict, ou
         plt.savefig(out_dir / "proportion_bar.png", dpi=dpi)
 
     plt.clf()
+
+
+### TILs
+def plot_tils_comparison(infiltrating_df, observation_key, cell_types, tils_types, threshold,
+                         color_dict, out_dir, figtype='box', show_palue=False, figsize=(15, 6), name=None):
+    # Compute p-value of Mann-whitney U test for each category between two observation groups
+    pvalues = []
+    group1_df = infiltrating_df[infiltrating_df[observation_key] == list(set(infiltrating_df[observation_key]))[0]]
+    group2_df = infiltrating_df[infiltrating_df[observation_key] == list(set(infiltrating_df[observation_key]))[1]]
+
+    for col in [f"{ct}_{tils}" for ct in cell_types for tils in tils_types]:
+        # If there's no this cell type in the image, then continue
+        if (len(group1_df[col].values) == 0) | (len(group2_df[col].values) == 0):
+            continue
+
+        stat, p_value = mannwhitneyu(group1_df[col].values, group2_df[col].values, alternative='two-sided')
+
+        pvalues.append([col, p_value])
+
+    pvalues_df = pd.DataFrame(pvalues, columns=['type', 'pvalue'])
+    pvalues_df.to_csv(out_dir / f"pval_{threshold}.csv", index=False)
+
+    # Plotting
+    df_melt = infiltrating_df.iloc[:, 1:].melt(id_vars=observation_key, var_name='variable', value_name='value')
+
+    fig, ax = plt.subplots(1, 1, figsize=figsize)
+
+    if figtype == 'box':
+        sns.boxplot(x="variable", y="value", hue=observation_key, data=df_melt, palette=color_dict, ax=ax)
+    elif figtype == 'violin':
+        sns.violinplot(x="variable", y="value", hue=observation_key, data=df_melt, palette=color_dict, ax=ax)
+
+    # Add the p-values we calculated above to the plot
+    if show_palue:
+        for i, type in enumerate([f"{ct}_{tils}" for ct in cell_types for tils in tils_types]):
+            # Position of the lines
+            x1, x2 = i - 0.2, i + 0.2
+            y_max = max(list(group1_df[type].values) + list(group2_df[type].values)) + 0.05
+
+            hight = 0.015
+
+            # Draw bracket (|-| shape)
+            ax.plot([x1, x1, x2, x2], [y_max, y_max + hight, y_max + hight, y_max], lw=1.5, c='black')
+
+            # Add p-value text
+            if pvalues_df['pvalue'][i] < 0.01:
+                ax.text((x1 + x2) / 2, y_max + hight + 0.01, f"p<0.01",
+                        ha='center', va='bottom', fontsize=8)
+            else:
+                ax.text((x1 + x2) / 2, y_max + hight + 0.01, f"p = {pvalues_df['pvalue'][i]:.2f}",
+                        ha='center', va='bottom', fontsize=8)
+
+    plt.xlabel('', fontsize=8)
+    plt.ylabel('Proportion', fontsize=10)
+    plt.xticks(fontsize=10, rotation=35)
+    plt.yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0], fontsize=8)
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    plt.ylim(-0.1, 1.2)
+
+    # Add patient counts to the legend block
+    handles, labels = ax.get_legend_handles_labels()
+
+    # Create new labels with count numbers
+    new_labels = [f"{label} (n={infiltrating_df[observation_key].value_counts()[label]})" for label in labels]
+
+    # Update legend
+    ax.legend(
+        handles,
+        new_labels,
+        title=name.split("_")[0],
+        loc='upper left',
+        prop={'size': 8}
+    )
+
+    plt.tight_layout()
+
+    if name:
+        plt.savefig(out_dir / f"{name}_tils.png", dpi=500)
+    else:
+        plt.savefig(out_dir / f"infiltration_{figtype}.png", dpi=500)
+
+    plt.clf()
+
 
 
 
