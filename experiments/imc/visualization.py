@@ -380,6 +380,110 @@ def plot_spatial_cluster_distribution(adata, cluster_key, out_dir, figsize=(7, 7
     plt.clf()
 
 
+def plot_umap(adata, cluster_key, out_dir, color_dict=COLORS, figsize=(7, 7), dotsize=1, name=None, dpi=150):
+    """
+    UMAP visualization
+    :param adata: AnnData
+    :param cluster_key: indicate which cluster key to use in obs, type: str
+    :param out_dir: output path, type: Path
+    :param color_dict: color dictionary for plotting, type: dict
+    :param figsize: figure size, type: tuple
+    :param dotsize: dot size, type: float
+    :param name: additional label for the file name, type: str
+    :return:
+    """
+    labels = adata.obs[cluster_key].values
+    label_categories = adata.obs[cluster_key].cat.categories
+    is_digit_labels = all(str(e).isdigit() for e in labels)
+
+    fig, ax = plt.subplots(1, 1, figsize=figsize)
+
+    for i in range(len(label_categories)):
+        lbl_idxs = np.where(labels == label_categories[i])[0]
+
+        if color_dict:
+            ax.scatter(adata.obsm["X_umap"][:, 0][lbl_idxs], adata.obsm["X_umap"][:, 1][lbl_idxs],
+                       c=color_dict[label_categories[i]], s=dotsize, label=label_categories[i])
+        else:
+            if is_digit_labels:
+                ax.scatter(adata.obsm["X_umap"][:, 0][lbl_idxs], adata.obsm["X_umap"][:, 1][lbl_idxs],
+                           c=COLORS[int(label_categories[i])], s=dotsize, label=label_categories[i])
+            else:
+                ax.scatter(adata.obsm["X_umap"][:, 0][lbl_idxs], adata.obsm["X_umap"][:, 1][lbl_idxs],
+                           c=COLORS[i], s=dotsize, label=label_categories[i])
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.xaxis.set_tick_params(labelbottom=False)
+    ax.yaxis.set_tick_params(labelleft=False)
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+    plt.xlabel("UMAP1", fontsize=8)
+    plt.ylabel("UMAP2", fontsize=8)
+
+    plt.legend(prop={'size': 8}, loc='upper right', bbox_to_anchor=(1.12, 1.1))
+
+    plt.tight_layout()
+
+    if name:
+        plt.savefig(out_dir / f"{name}_umap.png", dpi=dpi)
+    else:
+        plt.savefig(out_dir / "umap.png", dpi=dpi)
+
+    plt.clf()
+
+
+def plot_cell_expression_violin_split(adata, out_dir, set_count=8, figsize=(7, 3), rotation=0, name=None, dpi=150):
+    """
+    Plot cell expression comparison in violin plot
+    :param adata: AnnData
+    :param out_dir: output path, type: Path
+    :param set_count: count of markers per figure, type: int
+    :param figsize: figure size, type: tuple
+    :param rotation: rotation, type: int
+    :param name: additional label for the file name, type: str
+    :return:
+    """
+    if issparse(adata.X):
+        exp_df = pd.DataFrame(adata.X.toarray(), columns=adata.var_names)
+    else:
+        exp_df = pd.DataFrame(adata.X, columns=adata.var_names)
+
+    exp_melt = pd.melt(exp_df, var_name="Marker", value_name="Intensity")
+    pairs = construct_range(len(adata.var_names), set_count)
+
+    for i in range(len(pairs)):
+        subset = exp_melt[exp_melt.Marker.isin(adata.var_names[pairs[i][0]:pairs[i][1]])]
+
+        fig, ax = plt.subplots(1, 1, figsize=figsize)
+
+        sns.stripplot(data=subset, x="Marker", y="Intensity", jitter=True, size=1, ax=ax, alpha=0.08)
+        sns.violinplot(data=subset, x="Marker", y="Intensity", linewidth=1, color="white", ax=ax)
+
+        plt.xticks(fontsize=8, rotation=rotation)
+        plt.yticks(fontsize=8)
+
+        plt.grid(alpha=0.1)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+        plt.ylim(0, exp_melt["Intensity"].max() + exp_melt["Intensity"].std())
+
+        plt.xlabel("Marker", fontsize=8)
+        plt.ylabel("Intensity", fontsize=8)
+        plt.title(f"Marker intensities split {i + 1}", weight='bold', fontsize=8)
+
+        plt.tight_layout()
+
+        if name:
+            plt.savefig(out_dir / f"{name}_cell_expression_violin_{pairs[i][0]}_{pairs[i][1] - 1}.png", dpi=dpi)
+        else:
+            plt.savefig(out_dir / f"cell_expression_violin_{pairs[i][0]}_{pairs[i][1] - 1}.png", dpi=dpi)
+
+        plt.clf()
+
+
 def plot_cluster_cell_count(adata, cluster_key, out_dir, figsize=(3.5, 2), name=None, dpi=150):
     """
     :param adata: AnnData
@@ -444,10 +548,42 @@ def plot_cell_area_count(adata, out_dir, figsize=(3.5, 2), name=None, dpi=150):
     plt.clf()
 
 
-"""
-# Plotting neighbors
-plot_neighbor_graph(p_adata, out_dir, figsize=(7, 7), dotsize=1, linewidth=0.2, name=unique_id[i])
-"""
+def plot_neighbor_graph(adata, out_dir, figsize=(7, 7), dotsize=1, linewidth=0.2, name=None):
+    """
+    :param adata: AnnData
+    :param out_dir: output path, type: Path
+    :param figsize: figure size, type: tuple
+    :param dotsize: dot size, type: float
+    :param linewidth: line width, type: float
+    :param name: additional label for the file name, type: str
+    :return:
+    """
+    fig, ax = plt.subplots(1, 1, figsize=figsize)
+
+    # Plot edges
+    for u, v in adata.uns["relation"]:
+        x1, y1 = adata.obsm["spatial"][u]
+        x2, y2 = adata.obsm["spatial"][v]
+        ax.plot([x1, x2], [-y1, -y2], '-', zorder=1, c="black", linewidth=linewidth)
+
+    # Plot nodes
+    ax.scatter(adata.obsm["spatial"][:, 0], -adata.obsm["spatial"][:, 1], s=dotsize, zorder=2)
+
+    ax.set(xlabel="X Axis", ylabel="Y Axis", xticklabels=[], yticklabels=[])
+    ax.set_title("Neighbor Graph", weight="bold", fontsize=8)
+
+    plt.tight_layout()
+
+    if name:
+        plt.savefig(out_dir / f"{name}_neighbors.png", dpi=500)
+    else:
+        plt.savefig(out_dir / "neighbors.png", dpi=500)
+
+    plt.clf()
+
+# # Plotting neighbors
+# plot_neighbor_graph(p_adata, out_dir, figsize=(7, 7), dotsize=1, linewidth=0.2, name=unique_id[i])
+
 
 
 # Plot Cliff Delta (effect size)

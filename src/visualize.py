@@ -1073,6 +1073,7 @@ def plot_neighbor_graph(adata, out_dir, figsize=(7, 7), dotsize=1, linewidth=0.2
         plt.savefig(out_dir / f"{name}_neighbors.png", dpi=500)
     else:
         plt.savefig(out_dir / "neighbors.png", dpi=500)
+
     plt.clf()
 
 
